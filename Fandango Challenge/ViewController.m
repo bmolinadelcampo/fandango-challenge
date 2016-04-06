@@ -13,6 +13,7 @@
 @property (strong, nonatomic) NSMutableArray *imagesArray;
 @property (strong, nonatomic) NSURLSession *session;
 @property (strong, nonatomic) NSMutableString *titleString;
+@property (strong, nonatomic) NSMutableDictionary *imagesDictionary;
 - (void)loadFilms;
 @end
 
@@ -22,6 +23,7 @@
     [super viewDidLoad];
     self.filmsArray = [[NSMutableArray alloc] initWithCapacity:0];
     self.imagesArray = [[NSMutableArray alloc] initWithCapacity:0];
+    self.imagesDictionary = [[NSMutableDictionary alloc] init];
     [self loadFilms];
 }
 
@@ -32,7 +34,6 @@
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    [self.filmsArray sortUsingSelector:@selector(compare:)];
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"filmCell"];
     NSUInteger row = indexPath.row;
     NSString *titleString = self.filmsArray[row];
@@ -40,7 +41,7 @@
     cell.textLabel.font = [UIFont systemFontOfSize:20.0];
     cell.textLabel.textColor = [UIColor colorWithRed:0.75 green:0.17 blue:0.64 alpha:1];
     
-    cell.imageView.image = self.imagesArray[row];
+    cell.imageView.image = [self.imagesDictionary valueForKey:titleString];
     return cell;
 }
 
@@ -58,7 +59,12 @@
                                               NSXMLParser *ourParser = [[NSXMLParser alloc] initWithData:data];
                                               [ourParser setDelegate:self];
                                               [ourParser parse];
+                                              for (int i = 0; i < [self.filmsArray count] ; i++) {
+                                                  [self.imagesDictionary setObject:self.imagesArray[i] forKey:self.filmsArray[i]];
+                                              }
+                                              [self.filmsArray sortUsingSelector:@selector(compare:)];
                                               [[self tableView] reloadData];
+                                              NSLog(@"Table reloaded");
                                           }];
     [downloadTask resume];
 }
