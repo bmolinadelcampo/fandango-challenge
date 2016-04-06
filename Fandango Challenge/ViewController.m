@@ -10,8 +10,8 @@
 
 @interface ViewController ()
 @property (strong, nonatomic) NSMutableArray *filmsArray;
-@property (strong, nonatomic) NSMutableData *xmlData;
 @property (strong, nonatomic) NSURLSession *session;
+@property (strong, nonatomic) NSMutableString *titleString;
 - (void)loadFilms;
 @end
 
@@ -50,7 +50,33 @@
     NSURLSessionDataTask *downloadTask = [[NSURLSession sharedSession]
                                           dataTaskWithURL:ourUrl completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
                                               NSLog(@"%@", data);
+                                              NSXMLParser *ourParser = [[NSXMLParser alloc] initWithData:data];
+                                              [ourParser setDelegate:self];
+                                              [ourParser parse];
+                                              [[self tableView] reloadData];
                                           }];
     [downloadTask resume];
+}
+
+- (void)parser:(NSXMLParser *)parser didStartElement:(NSString *)elementName namespaceURI:(NSString *)namespaceURI qualifiedName:(NSString *)qName attributes:(NSDictionary<NSString *,NSString *> *)attributeDict
+{
+    if ([elementName isEqualToString:@"title"] && ![self.titleString isEqualToString:@"New Movies"]) {
+        NSLog(@"Found new title!");
+        self.titleString = [[NSMutableString alloc] init];
+    }
+}
+
+- (void)parser:(NSXMLParser *)parser foundCharacters:(NSString *)string
+{
+    [self.titleString appendString:string];
+}
+
+- (void)parser:(NSXMLParser *)parser didEndElement:(NSString *)elementName namespaceURI:(NSString *)namespaceURI qualifiedName:(NSString *)qName
+{
+    if ([elementName isEqualToString:@"title"] && ![self.titleString isEqualToString:@"New Movies"]) {
+        NSLog(@"ended title: %@", self.titleString);
+        [self.filmsArray addObject:[NSString stringWithString:self.titleString]];
+        self.titleString = nil;
+    }
 }
 @end
