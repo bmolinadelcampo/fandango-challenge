@@ -10,6 +10,7 @@
 
 @interface ViewController ()
 @property (strong, nonatomic) NSMutableArray *filmsArray;
+@property (strong, nonatomic) NSMutableArray *imagesArray;
 @property (strong, nonatomic) NSURLSession *session;
 @property (strong, nonatomic) NSMutableString *titleString;
 - (void)loadFilms;
@@ -20,6 +21,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.filmsArray = [[NSMutableArray alloc] initWithCapacity:0];
+    self.imagesArray = [[NSMutableArray alloc] initWithCapacity:0];
     [self loadFilms];
 }
 
@@ -30,12 +32,15 @@
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
+    [self.filmsArray sortUsingSelector:@selector(compare:)];
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"filmCell"];
     NSUInteger row = indexPath.row;
     NSString *titleString = self.filmsArray[row];
     cell.textLabel.text = titleString;
-    cell.textLabel.font = [UIFont systemFontOfSize:10.0];
+    cell.textLabel.font = [UIFont systemFontOfSize:20.0];
     cell.textLabel.textColor = [UIColor colorWithRed:0.75 green:0.17 blue:0.64 alpha:1];
+    
+    cell.imageView.image = self.imagesArray[row];
     return cell;
 }
 
@@ -58,11 +63,23 @@
     [downloadTask resume];
 }
 
-- (void)parser:(NSXMLParser *)parser didStartElement:(NSString *)elementName namespaceURI:(NSString *)namespaceURI qualifiedName:(NSString *)qName attributes:(NSDictionary<NSString *,NSString *> *)attributeDict
+- (void)parser:(NSXMLParser *)parser didStartElement:(NSString *)elementName namespaceURI:(NSString *)namespaceURI qualifiedName:(NSString *)qName attributes:(NSDictionary *)attributeDict
 {
     if ([elementName isEqualToString:@"title"] && ![self.titleString isEqualToString:@"New Movies"]) {
         NSLog(@"Found new title!");
         self.titleString = [[NSMutableString alloc] init];
+    }
+    
+//    if ([elementName isEqualToString:@"img"] && ![[attributeDict valueForKey:@"alt"] isEqualToString:@"Buy Tickets"]) {
+//        NSLog(@"%@", attributeDict);
+//    }
+    
+    if ([elementName isEqualToString:@"enclosure"]) {
+        NSArray *ourArray = [attributeDict allValues];
+        NSURL *ourURL = [NSURL URLWithString:ourArray[0]];
+        UIImage *posterImage = [UIImage imageWithData:[NSData dataWithContentsOfURL:ourURL]];
+        NSLog(@"%@", posterImage);
+        [self.imagesArray addObject:posterImage];
     }
 }
 
