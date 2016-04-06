@@ -11,7 +11,7 @@
 @interface ViewController ()
 @property (strong, nonatomic) NSMutableArray *filmsArray;
 @property (strong, nonatomic) NSMutableData *xmlData;
-@property (strong, nonatomic) NSURLSession *connectionInProgress;
+@property (strong, nonatomic) NSURLSession *session;
 - (void)loadFilms;
 @end
 
@@ -20,6 +20,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.filmsArray = [[NSMutableArray alloc] initWithCapacity:0];
+    [self loadFilms];
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
@@ -43,13 +44,13 @@
     [self.filmsArray removeAllObjects];
     [[self tableView] reloadData];
     
+    self.session = [NSURLSession sharedSession];
     NSURL *ourUrl = [NSURL URLWithString:@"http://www.fandango.com/rss/newmovies.rss"];
-//    NSURLRequest *ourRequest = [NSURLRequest requestWithURL:ourUrl cachePolicy:NSURLRequestReloadIgnoringCacheData timeoutInterval:30];
     
-    self.xmlData = [[NSMutableData alloc] init];
     NSURLSessionDataTask *downloadTask = [[NSURLSession sharedSession]
                                           dataTaskWithURL:ourUrl completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
                                               NSLog(@"%@", data);
-                                          }];}
-
+                                          }];
+    [downloadTask resume];
+}
 @end
