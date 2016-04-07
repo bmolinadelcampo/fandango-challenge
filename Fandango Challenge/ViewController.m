@@ -9,11 +9,12 @@
 #import "ViewController.h"
 
 @interface ViewController ()
-@property (strong, nonatomic) NSMutableArray *filmsArray;
+@property (strong, nonatomic) NSMutableArray *titlesArray;
+@property (strong, nonatomic) NSMutableArray *shortTitlesArray;
 @property (strong, nonatomic) NSMutableArray *imagesArray;
 @property (strong, nonatomic) NSURLSession *session;
 @property (strong, nonatomic) NSMutableString *titleString;
-@property (strong, nonatomic) NSMutableDictionary *imagesDictionary;
+@property (strong, nonatomic) NSMutableDictionary *filmsDictionary;
 - (void)loadFilms;
 @end
 
@@ -21,33 +22,34 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.filmsArray = [[NSMutableArray alloc] initWithCapacity:0];
+    self.titlesArray = [[NSMutableArray alloc] initWithCapacity:0];
     self.imagesArray = [[NSMutableArray alloc] initWithCapacity:0];
-    self.imagesDictionary = [[NSMutableDictionary alloc] init];
+    self.filmsDictionary = [[NSMutableDictionary alloc] init];
+    self.shortTitlesArray = [[NSMutableArray alloc] init];
     [self loadFilms];
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
-    return [self.filmsArray count];
+    return [self.titlesArray count];
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"filmCell"];
     NSUInteger row = indexPath.row;
-    NSString *titleString = self.filmsArray[row];
+    NSString *titleString = [self.filmsDictionary objectForKey:self.shortTitlesArray[row]][1];
     cell.textLabel.text = titleString;
     cell.textLabel.font = [UIFont systemFontOfSize:20.0];
     cell.textLabel.textColor = [UIColor colorWithRed:0.75 green:0.17 blue:0.64 alpha:1];
     
-    cell.imageView.image = [self.imagesDictionary valueForKey:titleString];
+    cell.imageView.image = [self.filmsDictionary objectForKey:self.shortTitlesArray[row]][0];
     return cell;
 }
 
 - (void)loadFilms
 {
-    [self.filmsArray removeAllObjects];
+    [self.titlesArray removeAllObjects];
     [[self tableView] reloadData];
     
     self.session = [NSURLSession sharedSession];
@@ -59,11 +61,16 @@
                                               NSXMLParser *ourParser = [[NSXMLParser alloc] initWithData:data];
                                               [ourParser setDelegate:self];
                                               [ourParser parse];
-                                              for (int i = 0; i < [self.filmsArray count] ; i++) {
-                                                  [self.imagesDictionary setObject:self.imagesArray[i] forKey:self.filmsArray[i]];
+                                              for (int i = 0; i < [self.titlesArray count] ; i++) {
+                                                  NSArray *imageAndFullTitle = @[self.imagesArray[i], self.titlesArray[i]];
+                                                  [self.filmsDictionary setObject:imageAndFullTitle forKey:self.shortTitlesArray[i]];
                                               }
-                                              [self.filmsArray sortUsingSelector:@selector(compare:)];
-                                              [[self tableView] reloadData];
+                                              [self.shortTitlesArray sortUsingSelector:@selector(compare:)];
+                                              NSLog(@"%@", self.titlesArray);
+                                              NSLog(@"%@", self.shortTitlesArray);
+                                              dispatch_async(dispatch_get_main_queue(), ^{
+                                                  [self.tableView reloadData];
+                                              });
                                               NSLog(@"Table reloaded");
                                           }];
     [downloadTask resume];
@@ -98,8 +105,24 @@
 {
     if ([elementName isEqualToString:@"title"] && ![self.titleString isEqualToString:@"New Movies"]) {
         NSLog(@"ended title: %@", self.titleString);
-        [self.filmsArray addObject:[NSString stringWithString:self.titleString]];
+        [self.titlesArray addObject:[NSString stringWithString:self.titleString]];
+        [self createShortTitle:self.titleString];
         self.titleString = nil;
     }
+}
+
+- (void)createShortTitle:(NSString *)originalTitle
+{
+    NSArray *wordsToRemove = @[@"The ", @"the ", @"Of ", @"of ", @"A ", @" a", @"An ", @" an", @"With ", @" with", @"In ", @" in", @"On ", @" on", @"Under ", @" under", @"At ", @" at", @"For ", @" for", @"And ", @" and", @"To ", @" to", @"But ", @" but", @"So ", @" so"];
+    NSString* shortTitleString = [[NSString alloc] initWithString:originalTitle];
+    
+    for (int i = 0; i < [wordsToRemove count]; i++) {
+        NSRange replaceRange = [shortTitleString rangeOfString:wordsToRemove[i]];
+        if (replaceRange.location != NSNotFound){
+            shortTitleString = [shortTitleString stringByReplacingCharactersInRange:replaceRange withString:@""];
+        }
+    }
+    NSLog(@"Short title is: %@", shortTitleString);
+    [self.shortTitlesArray addObject:shortTitleString];
 }
 @end
