@@ -27,6 +27,8 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    self.session = [NSURLSession sharedSession];
+
     self.titlesArray = [[NSMutableArray alloc] initWithCapacity:0];
     self.imagesArray = [[NSMutableArray alloc] initWithCapacity:0];
     self.filmsDictionary = [[NSMutableDictionary alloc] init];
@@ -69,39 +71,17 @@
     [self.titlesArray removeAllObjects];
     [[self tableView] reloadData];
     
-    self.session = [NSURLSession sharedSession];
     NSURL *ourUrl = [NSURL URLWithString:@"http://www.fandango.com/rss/newmovies.rss"];
     
-    NSURLSessionDataTask *downloadTask = [[NSURLSession sharedSession]
+    NSURLSessionDataTask *downloadTask = [self.session
                                           dataTaskWithURL:ourUrl completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
                                               NSLog(@"%@", data);
                                               NSXMLParser *ourParser = [[NSXMLParser alloc] initWithData:data];
                                               [ourParser setDelegate:self];
                                               [ourParser parse];
-                                              [self fetchJsonFeed:self.titlesArray];
-                                              
-//                                              for (int i = 0; i < [self.titlesArray count] ; i++) {
-//                                                  NSArray *imageAndFullTitle = @[self.imagesArray[i], self.titlesArray[i]];
-//                                                  NSLog(@"%@", self.ratingsArray);
-//                                                  [self.filmsDictionary setObject:imageAndFullTitle forKey:self.ratingsArray[i]];
-//                                              }
-//                                              
-//                                              [self.ratingsArray sortUsingSelector:@selector(compare:)];
-//                                              
-//                                              /* SORTING ALPHABETICALLY
-//                                               
-//                                              for (int i = 0; i < [self.titlesArray count] ; i++) {
-//                                                  NSArray *imageAndFullTitle = @[self.imagesArray[i], self.titlesArray[i]];
-//                                                  [self.filmsDictionary setObject:imageAndFullTitle forKey:self.shortTitlesArray[i]];
-//                                              }
-//                                              
-//                                              [self.shortTitlesArray sortUsingSelector:@selector(compare:)];
-//                                               */
-//            
-//                                              dispatch_async(dispatch_get_main_queue(), ^{
-//                                                  [self.tableView reloadData];
-//                                              });
-//                                              NSLog(@"Table reloaded");
+                                              dispatch_async(dispatch_get_main_queue(), ^{
+                                                  [self fetchJsonFeed:self.titlesArray];
+                                              });
                                           }];
     [downloadTask resume];
 }
@@ -153,23 +133,19 @@
 
 - (void)fetchJsonFeed:(NSArray *)titlesArray
 {
-    self.session = [NSURLSession sharedSession];
-    
     for (NSString *title in titlesArray) {
         self.jsonFeed = nil;
-        
         NSURL *ourURL = [self composeURLForJsonFeed:title];
-        NSURLSessionDataTask *dataTask = [[NSURLSession sharedSession] dataTaskWithURL:ourURL
-                                                     completionHandler:^(NSData *data2, NSURLResponse *response2, NSError *error2){
-                                                        NSLog(@"%@", data2);
-                                                        self.jsonFeed = [NSJSONSerialization JSONObjectWithData:data2 options:0 error:&error2];
-                                                        NSLog(@"%@", self.jsonFeed);
-                                                        [self.ratingsArray addObject:[self.jsonFeed objectForKey:@"imdbRating"]];
-                                                         if (self.ratingsArray.count == self.titlesArray.count) {
-                                                             [self arrangeData];
-                                                         }
-                                                    }];
-
+        NSURLSessionDataTask *dataTask = [self.session dataTaskWithURL:ourURL
+                                                     completionHandler:^(NSData *data, NSURLResponse *response, NSError *error)
+                                          {
+                                              self.jsonFeed = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
+                                              [self.ratingsArray addObject:[self.jsonFeed objectForKey:@"imdbRating"]];
+                                              
+                                              if (self.ratingsArray.count == self.titlesArray.count) {
+                                                  [self arrangeData];
+                                              }
+                                          }];
         [dataTask resume];
     }
 }
@@ -191,7 +167,6 @@
 {
     for (int i = 0; i < [self.titlesArray count] ; i++) {
         NSArray *imageAndFullTitle = @[self.imagesArray[i], self.titlesArray[i]];
-        NSLog(@"%@", self.ratingsArray);
         [self.filmsDictionary setObject:imageAndFullTitle forKey:self.ratingsArray[i]];
     }
     
@@ -212,4 +187,5 @@
     });
     NSLog(@"Table reloaded");
 }
+
 @end
