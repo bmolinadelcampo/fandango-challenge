@@ -15,6 +15,11 @@
 @property (strong, nonatomic) NSURLSession *session;
 @property (strong, nonatomic) NSMutableString *titleString;
 @property (strong, nonatomic) NSMutableDictionary *filmsDictionary;
+@property (strong, nonatomic) NSMutableArray *ratingsArray;
+
+@property (strong, nonatomic) NSDictionary *jsonFeed;
+- (void)fetchJsonFeed:(NSArray *)titlesArray;
+- (NSURL *)composeURLForJsonFeed:(NSString *)title;
 - (void)loadFilms;
 @end
 
@@ -26,7 +31,10 @@
     self.imagesArray = [[NSMutableArray alloc] initWithCapacity:0];
     self.filmsDictionary = [[NSMutableDictionary alloc] init];
     self.shortTitlesArray = [[NSMutableArray alloc] init];
+    self.ratingsArray = [[NSMutableArray alloc] init];
     [self loadFilms];
+    
+    [self composeURLForJsonFeed:@"Our Last Tango"];
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
@@ -38,12 +46,21 @@
 {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"filmCell"];
     NSUInteger row = indexPath.row;
-    NSString *titleString = [self.filmsDictionary objectForKey:self.shortTitlesArray[row]][1];
+    
+    /*
+     NSString *titleString = [self.filmsDictionary objectForKey:self.shortTitlesArray[row]][1];
+    */
+    
+    NSString *titleString = [self.filmsDictionary objectForKey:self.ratingsArray[row]][1];
+
     cell.textLabel.text = titleString;
     cell.textLabel.font = [UIFont systemFontOfSize:20.0];
     cell.textLabel.textColor = [UIColor colorWithRed:0.75 green:0.17 blue:0.64 alpha:1];
-    
+    /* SORTING ALPHABETICALLY
     cell.imageView.image = [self.filmsDictionary objectForKey:self.shortTitlesArray[row]][0];
+    */
+    
+    cell.imageView.image = [self.filmsDictionary objectForKey:self.ratingsArray[row]][0];
     return cell;
 }
 
@@ -61,17 +78,30 @@
                                               NSXMLParser *ourParser = [[NSXMLParser alloc] initWithData:data];
                                               [ourParser setDelegate:self];
                                               [ourParser parse];
-                                              for (int i = 0; i < [self.titlesArray count] ; i++) {
-                                                  NSArray *imageAndFullTitle = @[self.imagesArray[i], self.titlesArray[i]];
-                                                  [self.filmsDictionary setObject:imageAndFullTitle forKey:self.shortTitlesArray[i]];
-                                              }
-                                              [self.shortTitlesArray sortUsingSelector:@selector(compare:)];
-                                              NSLog(@"%@", self.titlesArray);
-                                              NSLog(@"%@", self.shortTitlesArray);
-                                              dispatch_async(dispatch_get_main_queue(), ^{
-                                                  [self.tableView reloadData];
-                                              });
-                                              NSLog(@"Table reloaded");
+                                              [self fetchJsonFeed:self.titlesArray];
+                                              
+//                                              for (int i = 0; i < [self.titlesArray count] ; i++) {
+//                                                  NSArray *imageAndFullTitle = @[self.imagesArray[i], self.titlesArray[i]];
+//                                                  NSLog(@"%@", self.ratingsArray);
+//                                                  [self.filmsDictionary setObject:imageAndFullTitle forKey:self.ratingsArray[i]];
+//                                              }
+//                                              
+//                                              [self.ratingsArray sortUsingSelector:@selector(compare:)];
+//                                              
+//                                              /* SORTING ALPHABETICALLY
+//                                               
+//                                              for (int i = 0; i < [self.titlesArray count] ; i++) {
+//                                                  NSArray *imageAndFullTitle = @[self.imagesArray[i], self.titlesArray[i]];
+//                                                  [self.filmsDictionary setObject:imageAndFullTitle forKey:self.shortTitlesArray[i]];
+//                                              }
+//                                              
+//                                              [self.shortTitlesArray sortUsingSelector:@selector(compare:)];
+//                                               */
+//            
+//                                              dispatch_async(dispatch_get_main_queue(), ^{
+//                                                  [self.tableView reloadData];
+//                                              });
+//                                              NSLog(@"Table reloaded");
                                           }];
     [downloadTask resume];
 }
@@ -82,10 +112,6 @@
         NSLog(@"Found new title!");
         self.titleString = [[NSMutableString alloc] init];
     }
-    
-//    if ([elementName isEqualToString:@"img"] && ![[attributeDict valueForKey:@"alt"] isEqualToString:@"Buy Tickets"]) {
-//        NSLog(@"%@", attributeDict);
-//    }
     
     if ([elementName isEqualToString:@"enclosure"]) {
         NSArray *ourArray = [attributeDict allValues];
@@ -117,12 +143,73 @@
     NSString* shortTitleString = [[NSString alloc] initWithString:originalTitle];
     
     for (int i = 0; i < [wordsToRemove count]; i++) {
-        NSRange replaceRange = [shortTitleString rangeOfString:wordsToRemove[i]];
-        if (replaceRange.location != NSNotFound){
-            shortTitleString = [shortTitleString stringByReplacingCharactersInRange:replaceRange withString:@""];
+        if ([shortTitleString rangeOfString:wordsToRemove[i]].location != NSNotFound){
+            shortTitleString = [shortTitleString stringByReplacingOccurrencesOfString:@" " withString:@""];
         }
     }
     NSLog(@"Short title is: %@", shortTitleString);
     [self.shortTitlesArray addObject:shortTitleString];
+}
+
+- (void)fetchJsonFeed:(NSArray *)titlesArray
+{
+    self.session = [NSURLSession sharedSession];
+    
+    for (NSString *title in titlesArray) {
+        self.jsonFeed = nil;
+        
+        NSURL *ourURL = [self composeURLForJsonFeed:title];
+        NSURLSessionDataTask *dataTask = [[NSURLSession sharedSession] dataTaskWithURL:ourURL
+                                                     completionHandler:^(NSData *data2, NSURLResponse *response2, NSError *error2){
+                                                        NSLog(@"%@", data2);
+                                                        self.jsonFeed = [NSJSONSerialization JSONObjectWithData:data2 options:0 error:&error2];
+                                                        NSLog(@"%@", self.jsonFeed);
+                                                        [self.ratingsArray addObject:[self.jsonFeed objectForKey:@"imdbRating"]];
+                                                         if (self.ratingsArray.count == self.titlesArray.count) {
+                                                             [self arrangeData];
+                                                         }
+                                                    }];
+
+        [dataTask resume];
+    }
+}
+
+- (NSURL *)composeURLForJsonFeed:(NSString *)title{
+    
+    NSString *commonPartOfUrl = @"http://www.omdbapi.com/?t=";
+    NSString *titleWithPlus = title;
+    
+    if ([title rangeOfString:@" "].location != NSNotFound) {
+        titleWithPlus = [title stringByReplacingOccurrencesOfString:@" " withString:@"+"];
+    }
+    NSString *fullURLString = [commonPartOfUrl stringByAppendingString:titleWithPlus];
+    NSLog(@"%@", [NSURL URLWithString:fullURLString]);
+    return [NSURL URLWithString:fullURLString];
+}
+
+- (void)arrangeData
+{
+    for (int i = 0; i < [self.titlesArray count] ; i++) {
+        NSArray *imageAndFullTitle = @[self.imagesArray[i], self.titlesArray[i]];
+        NSLog(@"%@", self.ratingsArray);
+        [self.filmsDictionary setObject:imageAndFullTitle forKey:self.ratingsArray[i]];
+    }
+    
+    [self.ratingsArray sortUsingSelector:@selector(compare:)];
+    
+    /* SORTING ALPHABETICALLY
+     
+     for (int i = 0; i < [self.titlesArray count] ; i++) {
+     NSArray *imageAndFullTitle = @[self.imagesArray[i], self.titlesArray[i]];
+     [self.filmsDictionary setObject:imageAndFullTitle forKey:self.shortTitlesArray[i]];
+     }
+     
+     [self.shortTitlesArray sortUsingSelector:@selector(compare:)];
+     */
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.tableView reloadData];
+    });
+    NSLog(@"Table reloaded");
 }
 @end
